@@ -64,8 +64,8 @@ class ACMOJClient:
 
         except requests.exceptions.RequestException as e:
             print(f"API Request failed: {e}")
-            if 'response' in locals() and response:
-                print(f"Response text: {response.text}")
+            if hasattr(e, 'response') and e.response is not None:
+                print(f"Response text: {e.response.text}")
             return None
 
     def _save_submission_id(self, submission_id):
@@ -113,6 +113,11 @@ def main():
     submit_parser.add_argument("--code-file", type=str, required=True,
                                help="Path to the source code file")
 
+    # Submit Git repository
+    submit_git_parser = subparsers.add_parser("submit_git", help="Submit a Git repository")
+    submit_git_parser.add_argument("--problem-id", type=int, required=True, help="Problem ID")
+    submit_git_parser.add_argument("--git-url", type=str, required=True, help="Git repository URL")
+
     # Sub-command for checking submission status
     status_parser = subparsers.add_parser("status", help="Check submission status")
     status_parser.add_argument("--submission-id", type=int, required=True, help="Submission ID")
@@ -140,8 +145,12 @@ def main():
             print(f"Error: Failed to read code file: {e}")
             exit(1)
 
-        result = client.submit_code(args.problem_id, args.language, code_text)
+        result = client._make_request("POST", f"/problem/{args.problem_id}/submit", data={"language": args.language, "code": code_text})
+        if result and 'id' in result:
+            client._save_submission_id(result['id'])
 
+    elif args.command == "submit_git":
+        result = client.submit_git(args.problem_id, args.git_url)
     elif args.command == "status":
         result = client.get_submission_detail(args.submission_id)
     elif args.command == "abort":
